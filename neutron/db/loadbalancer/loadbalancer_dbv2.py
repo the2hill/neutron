@@ -153,6 +153,7 @@ class HealthMonitorV2(model_base.BASEV2, models_v2.HasId, models_v2.HasTenant):
 
     def to_dict(self, pool=False):
         hm_dict = {'id': self.id,
+                   'tenant_id': self.tenant_id,
                    'type': self.type,
                    'delay': self.delay,
                    'timeout': self.timeout,
@@ -637,6 +638,11 @@ class LoadBalancerPluginDbv2(loadbalancerv2.LoadBalancerPluginBaseV2,
         if member.pool_id != nodepool_id:
             raise loadbalancerv2.PoolNotFound(pool_id=nodepool_id)
         return member
+
+    def delete_member(self, context, id):
+        with context.session.begin(subtransactions=True):
+            member_db = self._get_resource(context, MemberV2, id)
+            context.session.delete(member_db)
 
     def create_healthmonitor(self, context, healthmonitor):
         tenant_id = self._get_tenant_id_for_create(context, healthmonitor)

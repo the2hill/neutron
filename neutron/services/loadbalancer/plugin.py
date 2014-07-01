@@ -463,7 +463,7 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                                         updated_lb, old_db_entity=old_lb)
         return updated_lb.to_dict()
 
-    def _delete_loadbalancer(self, context, id):
+    def _delete_db_loadbalancer(self, context, id):
         super(LoadBalancerPluginv2, self).delete_loadbalancer(context, id)
 
     def delete_loadbalancer(self, context, id, body=None):
@@ -502,7 +502,8 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                 self._call_driver_operation(
                     context, driver.listener.create, listener_db)
         else:
-            self.update_status(context, ldbv2.Listener, id, constants.ACTIVE)
+            self.update_status(context, ldbv2.Listener, listener_db.id,
+                               constants.ACTIVE)
 
         return listener_db.to_dict()
 
@@ -531,6 +532,9 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
             self.update_status(context, ldbv2.Listener, id, constants.ACTIVE)
 
         return listener_db.to_dict()
+
+    def _delete_db_listener(self, context, id):
+        super(LoadBalancerPluginv2, self).delete_listener(context, id)
 
     def delete_listener(self, context, id, body=None):
         self.test_and_set_status(context, ldbv2.Listener, id,
@@ -596,6 +600,9 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
 
         return updated_nodepool.to_dict()
 
+    def _delete_db_nodepool(self, context, id):
+        super(LoadBalancerPluginv2, self).delete_nodepool(context, id)
+
     def delete_nodepool(self, context, id, body=None):
         self.test_and_set_status(context, ldbv2.NodePool, id,
                                  constants.PENDING_DELETE)
@@ -641,7 +648,8 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                                             driver.member.create,
                                             member_db)
         else:
-            self.update_status(context, ldbv2.MemberV2, id, constants.ACTIVE)
+            self.update_status(context, ldbv2.MemberV2, member_db.id,
+                               constants.ACTIVE)
 
         return member_db.to_dict()
 
@@ -746,6 +754,9 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                                constants.ACTIVE)
 
         return updated_hm.to_dict()
+
+    def _delete_db_healthmonitor(self, context, id):
+        super(LoadBalancerPluginv2, self).delete_healthmonitor(context, id)
 
     def delete_healthmonitor(self, context, id, body=None):
         self.test_and_set_status(context, ldbv2.HealthMonitorV2, id,
