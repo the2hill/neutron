@@ -414,7 +414,7 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
     def _is_driver_new_style(self, driver):
         return not hasattr(driver, 'create_vip')
 
-    def _call_driver_operation(self, driver_method, db_entity,
+    def _call_driver_operation(self, context, driver_method, db_entity,
                                old_db_entity=None):
         try:
             if old_db_entity:
@@ -440,7 +440,7 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
             context, loadbalancer)
         self.service_type_manager.add_resource_association(
             context,
-            constants.LOADBALANCER,
+            constants.LOADBALANCERv2,
             provider_name, lb_db.id)
         driver = self.drivers[provider_name]
         if self._is_driver_new_style(driver):
@@ -463,6 +463,9 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                                         updated_lb, old_db_entity=old_lb)
         return updated_lb.to_dict()
 
+    def _delete_loadbalancer(self, context, id):
+        super(LoadBalancerPluginv2, self).delete_loadbalancer(context, id)
+
     def delete_loadbalancer(self, context, id, body=None):
         self.test_and_set_status(context, ldbv2.LoadBalancer, id,
                                  constants.PENDING_DELETE)
@@ -471,7 +474,7 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
         driver = self._get_driver_for_provider(old_lb.provider.provider_name)
         if self._is_driver_new_style(driver):
             self._call_driver_operation(
-                context, driver.load_balancer.create, old_lb)
+                context, driver.load_balancer.delete, old_lb)
 
     def get_loadbalancer(self, context, id, fields=None):
         lb_db = super(LoadBalancerPluginv2, self).get_loadbalancer(

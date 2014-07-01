@@ -474,10 +474,11 @@ class LoadBalancerPluginDbv2(loadbalancerv2.LoadBalancerPluginBaseV2,
     def delete_loadbalancer(self, context, id):
         with context.session.begin(subtransactions=True):
             lb_db = self._get_resource(context, LoadBalancer, id)
-            if lb_db.listener:
+            if lb_db.listeners or len(lb_db.listeners) > 0:
                 raise loadbalancerv2.LoadBalancerInUse(
-                    listener_id=lb_db.listener.id)
+                    listener_id=lb_db.listener[0].id)
             context.session.delete(lb_db)
+            context.session.delete(lb_db.vip_port)
 
     def get_loadbalancers(self, context, filters=None, fields=None):
         return self._get_resources(context, LoadBalancer, filters=filters)
