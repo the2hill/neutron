@@ -16,9 +16,7 @@
 import contextlib
 import logging
 
-import mock
 from oslo.config import cfg
-import testtools
 import webob.exc
 
 from neutron.api import extensions
@@ -33,8 +31,7 @@ from neutron.plugins.common import constants
 from neutron.services.loadbalancer import (
     plugin as loadbalancer_plugin
 )
-from neutron.services.loadbalancer.drivers import abstract_driver
-from neutron.services import provider_configuration as pconf
+
 from neutron.tests.unit import test_db_plugin
 
 
@@ -523,6 +520,304 @@ class TestLbaas(LbaasPluginDbTestCase):
                       if k in expected}
             self.assertEqual(expected, actual)
         return healthmonitor
+
+    def test_show_healthmonitor(self, **extras):
+        expected = {
+            'type': 'TCP',
+            'delay': 1,
+            'timeout': 1,
+            'max_retries': 1,
+            'http_method': 'GET',
+            'url_path': '/',
+            'expected_codes': '200',
+            'admin_state_up': True,
+            'tenant_id': self._tenant_id,
+            'status': constants.ACTIVE
+        }
+
+        expected.update(extras)
+
+        with self.healthmonitor() as healthmonitor:
+            req = self.new_show_request('healthmonitors',
+                                        healthmonitor['healthmonitor']['id'],
+                                        fmt=self.fmt)
+            res = self.deserialize(self.fmt, req.get_response(self.ext_api))
+            actual = {k: v for k, v in res['healthmonitor'].items()
+                      if k in expected}
+            self.assertEqual(expected, actual)
+
+        return healthmonitor
+
+    def test_update_healthmonitor(self, **extras):
+        expected = {
+            'type': 'TCP',
+            'delay': 30,
+            'timeout': 10,
+            'max_retries': 4,
+            'http_method': 'GET',
+            'url_path': '/index.html',
+            'expected_codes': '200,404',
+            'admin_state_up': True,
+            'tenant_id': self._tenant_id,
+            'status': constants.ACTIVE
+        }
+
+        expected.update(extras)
+
+        with self.healthmonitor() as healthmonitor:
+            data = {'healthmonitor': {'delay': 30,
+                                      'timeout': 10,
+                                      'max_retries': 4,
+                                      'expected_codes': '200,404',
+                                      'url_path': '/index.html'}}
+            req = self.new_update_request("healthmonitors", data,
+                                          healthmonitor['healthmonitor']['id'],
+                                          self.fmt)
+            res = self.deserialize(self.fmt, req.get_response(self.ext_api))
+            actual = {k: v for k, v in res['healthmonitor'].items()
+                      if k in expected}
+            self.assertEqual(expected, actual)
+
+        return healthmonitor
+
+    def test_delete_healthmonitor(self):
+        with self.healthmonitor(no_delete=True) as monitor:
+            ctx = context.get_admin_context()
+            qry = ctx.session.query(ldb.HealthMonitorV2)
+            qry = qry.filter_by(id=monitor['healthmonitor']['id'])
+            self.assertIsNotNone(qry.first())
+
+            req = self.new_delete_request('healthmonitors',
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(res.status_int, webob.exc.HTTPNoContent.code)
+            qry = ctx.session.query(ldb.HealthMonitorV2)
+            qry = qry.filter_by(id=monitor['healthmonitor']['id'])
+            self.assertIsNone(qry.first())
+
+    def test_create_health_monitor_with_timeout_invalid(self):
+        data = {'healthmonitor': {'type': 'HTTP',
+                                  'delay': 1,
+                                  'timeout': -1,
+                                  'max_retries': 2,
+                                  'admin_state_up': True,
+                                  'tenant_id': self._tenant_id}}
+        req = self.new_create_request('healthmonitors', data, self.fmt)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_update_health_monitor_with_timeout_invalid(self):
+        with self.healthmonitor() as monitor:
+            data = {'healthmonitor': {'delay': 10,
+                                      'timeout': -1,
+                                      'max_retries': 2,
+                                      'admin_state_up': False}}
+            req = self.new_update_request("healthmonitors",
+                                          data,
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_create_health_monitor_with_delay_invalid(self):
+        data = {'healthmonitor': {'type': 'HTTP',
+                                  'delay': -1,
+                                  'timeout': 1,
+                                  'max_retries': 2,
+                                  'admin_state_up': True,
+                                  'tenant_id': self._tenant_id}}
+        req = self.new_create_request('healthmonitors', data, self.fmt)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_update_health_monitor_with_delay_invalid(self):
+        with self.healthmonitor() as monitor:
+            data = {'healthmonitor': {'delay': -1,
+                                      'timeout': 1,
+                                      'max_retries': 2,
+                                      'admin_state_up': False}}
+            req = self.new_update_request("healthmonitors",
+                                          data,
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_create_health_monitor_with_max_retries_invalid(self):
+        data = {'healthmonitor': {'type': 'HTTP',
+                                  'delay': 1,
+                                  'timeout': 1,
+                                  'max_retries': 20,
+                                  'admin_state_up': True,
+                                  'tenant_id': self._tenant_id}}
+        req = self.new_create_request('healthmonitors', data, self.fmt)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_update_health_monitor_with_max_retries_invalid(self):
+        with self.healthmonitor() as monitor:
+            data = {'healthmonitor': {'delay': 1,
+                                      'timeout': 1,
+                                      'max_retries': 20,
+                                      'admin_state_up': False}}
+            req = self.new_update_request("healthmonitors",
+                                          data,
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_create_health_monitor_with_http_method_invalid(self):
+        data = {'healthmonitor': {'type': 1,
+                                  'delay': 1,
+                                  'timeout': 1,
+                                  'max_retries': 2,
+                                  'admin_state_up': True,
+                                  'tenant_id': self._tenant_id}}
+        req = self.new_create_request('healthmonitors', data, self.fmt)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_update_health_monitor_with_http_method_invalid(self):
+        with self.healthmonitor() as monitor:
+            data = {'healthmonitor': {'type': 1,
+                                      'delay': 1,
+                                      'timeout': 1,
+                                      'max_retries': 2,
+                                      'admin_state_up': False}}
+            req = self.new_update_request("healthmonitors",
+                                          data,
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_create_health_monitor_with_url_path_invalid(self):
+        data = {'healthmonitor': {'type': 'HTTP',
+                                  'url_path': 1,
+                                  'delay': 1,
+                                  'timeout': 1,
+                                  'max_retries': 2,
+                                  'admin_state_up': True,
+                                  'tenant_id': self._tenant_id}}
+        req = self.new_create_request('healthmonitors', data, self.fmt)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_update_health_monitor_with_url_path_invalid(self):
+        with self.healthmonitor() as monitor:
+            data = {'healthmonitor': {'url_path': 1,
+                                      'delay': 1,
+                                      'timeout': 1,
+                                      'max_retries': 2,
+                                      'admin_state_up': False}}
+            req = self.new_update_request("healthmonitors",
+                                          data,
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(webob.exc.HTTPBadRequest.code, res.status_int)
+
+    def test_add_healthmonitor_to_pool(self):
+        with self.healthmonitor(type='HTTP') as monitor:
+            data = {'nodepool': {'protocol': 'HTTP',
+                                 'healthmonitor_id':
+                                     monitor['healthmonitor']['id'],
+                                 'lb_algorithm': 'ROUND_ROBIN',
+                                 'tenant_id': self._tenant_id}
+                    }
+            req = self.new_create_request(
+                'nodepools',
+                data,
+                fmt=self.fmt,)
+            res = req.get_response(self.ext_api)
+            self.assertEqual(res.status_int, webob.exc.HTTPCreated.code)
+
+            ctx = context.get_admin_context()
+
+            # check if we actually have corresponding Pool associations
+            qry = ctx.session.query(ldb.NodePool)
+            qry = qry.filter_by(
+                healthmonitor_id=monitor['healthmonitor']['id'])
+            self.assertTrue(qry.all())
+
+    def test_update_healthmonitor_to_pool(self):
+        with self.healthmonitor(type='HTTP') as monitor:
+            with self.nodepool() as pool:
+                data = {'nodepool': {'healthmonitor_id':
+                                         monitor['healthmonitor']['id']}
+                        }
+                req = self.new_update_request(
+                    'nodepools',
+                    data,
+                    pool['nodepool']['id'],
+                    fmt=self.fmt,)
+                res = req.get_response(self.ext_api)
+                self.assertEqual(res.status_int, webob.exc.HTTPOk.code)
+
+                ctx = context.get_admin_context()
+
+                # check if we actually have corresponding Pool associations
+                qry = ctx.session.query(ldb.NodePool)
+                qry = qry.filter_by(
+                    healthmonitor_id=monitor['healthmonitor']['id'])
+                self.assertTrue(qry.all())
+
+    def test_delete_healthmonitor_with_associations_allowed(self):
+        with self.healthmonitor(type='HTTP', no_delete=True) as monitor:
+            data = {'nodepool': {'protocol': 'HTTP',
+                                 'healthmonitor_id':
+                                     monitor['healthmonitor']['id'],
+                                 'lb_algorithm': 'ROUND_ROBIN',
+                                 'tenant_id': self._tenant_id}
+                    }
+            req = self.new_create_request(
+                'nodepools',
+                data,
+                fmt=self.fmt,)
+            res = req.get_response(self.ext_api)
+            self.assertEqual(res.status_int, webob.exc.HTTPCreated.code)
+
+            ctx = context.get_admin_context()
+
+            # check if we actually have corresponding Pool associations
+            qry = ctx.session.query(ldb.NodePool)
+            qry = qry.filter_by(
+                healthmonitor_id=monitor['healthmonitor']['id'])
+            self.assertTrue(qry.all())
+            # try to delete the HealthMonitor instance
+            req = self.new_delete_request('healthmonitors',
+                                          monitor['healthmonitor']['id'])
+            res = req.get_response(self.ext_api)
+            self.assertEqual(res.status_int, webob.exc.HTTPNoContent.code)
+
+            qry = ctx.session.query(ldb.HealthMonitorV2)
+            qry = qry.filter_by(id=monitor['healthmonitor']['id'])
+            self.assertIsNone(qry.first())
+            # check if all corresponding Pool associations are deleted
+            qry = ctx.session.query(ldb.NodePool)
+            qry = qry.filter_by(
+                healthmonitor_id=monitor['healthmonitor']['id'])
+            self.assertEqual([], qry.all())
+
+    def test_add_healthmonitor_to_pool_invalid_monitor_id(self):
+        data = {'nodepool': {'protocol': 'HTTP',
+                             'healthmonitor_id': 'notanid',
+                             'lb_algorithm': 'ROUND_ROBIN',
+                             'tenant_id': self._tenant_id}
+                }
+        req = self.new_create_request(
+            'nodepools',
+            data,
+            fmt=self.fmt,)
+        res = req.get_response(self.ext_api)
+        self.assertEqual(res.status_int, webob.exc.HTTPNotFound.code)
+
+    def test_update_healthmonitor_to_pool_invalid_monitor_id(self):
+        with self.nodepool() as pool:
+            data = {'nodepool': {'healthmonitor_id': 'notanid'}}
+            req = self.new_update_request(
+                'nodepools',
+                data,
+                pool['nodepool']['id'],
+                fmt=self.fmt,)
+            res = req.get_response(self.ext_api)
+            self.assertEqual(res.status_int, webob.exc.HTTPNotFound.code)
 
 
 class TestLoadBalancerXML(TestLbaas):

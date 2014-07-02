@@ -550,6 +550,9 @@ class LoadBalancerPluginDbv2(loadbalancerv2.LoadBalancerPluginBaseV2,
             nodepool['status'] = constants.PENDING_CREATE
             if nodepool['healthmonitor_id'] == attributes.ATTR_NOT_SPECIFIED:
                 nodepool['healthmonitor_id'] = None
+            if nodepool['healthmonitor_id'] is not None:
+                self._get_resource(context, HealthMonitorV2,
+                                   nodepool['healthmonitor_id'])
             pool_db = NodePool(id=uuidutils.generate_uuid(),
                                tenant_id=tenant_id,
                                name=nodepool['name'],

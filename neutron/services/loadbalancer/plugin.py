@@ -576,9 +576,13 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
         return db_pool.to_dict()
 
     def update_nodepool(self, context, id, nodepool):
+        nodepool = nodepool.get('nodepool')
+        if nodepool.get('healthmonitor_id') is not None:
+                super(LoadBalancerPluginv2, self).get_healthmonitor(
+                    context, nodepool['healthmonitor_id'])
         self.test_and_set_status(context, ldbv2.NodePool, id,
                                  constants.PENDING_UPDATE)
-        nodepool = nodepool.get('nodepool')
+
         old_nodepool = super(LoadBalancerPluginv2, self).get_nodepool(
             context, id)
         updated_nodepool = super(LoadBalancerPluginv2, self).update_nodepool(
