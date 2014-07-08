@@ -50,6 +50,7 @@ class LoggingNoopCommonManager(object):
 
     def delete(self, context, obj):
         LOG.debug("LB %s no-op, delete %s", self.__class__.__name__, obj.id)
+        self.db_delete(context, obj.id)
 
 
 class LoggingNoopLoadBalancerManager(LoggingNoopCommonManager,
@@ -72,14 +73,7 @@ class LoggingNoopLoadBalancerManager(LoggingNoopCommonManager,
 
 class LoggingNoopListenerManager(LoggingNoopCommonManager,
                                  driver_base.BaseListenerManager):
-
-    def create(self, context, obj):
-        LOG.debug("LB listener no-op, create %s", self.__class__.__name__,
-                  obj.id)
-
-    def update(self, context, old_obj, obj):
-        LOG.debug("LB listener no-op, update %s", self.__class__.__name__,
-                  obj.id)
+    pass
 
 
 class LoggingNoopPoolManager(LoggingNoopCommonManager,
@@ -94,13 +88,4 @@ class LoggingNoopMemberManager(LoggingNoopCommonManager,
 
 class LoggingNoopHealthMonitorManager(LoggingNoopCommonManager,
                                       driver_base.BaseHealthMonitorManager):
-
-    def create(self, context, obj):
-        LOG.debug("LB health monitor no-op, create %s",
-                  self.__class__.__name__, obj.id)
-        self.active(context, obj.id, obj.id)
-
-    def update(self, context, old_obj, obj):
-        LOG.debug("LB health monitor no-op, update %s",
-                  self.__class__.__name__, obj.id)
-        self.active(context, obj.id, obj.id)
+    pass
