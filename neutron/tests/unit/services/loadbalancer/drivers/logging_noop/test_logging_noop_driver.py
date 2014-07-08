@@ -117,7 +117,7 @@ class LoadBalancerManagerTest(ManagerTestWithUpdates):
             "active_connections": 0,
             "total_connections": 0
         }
-        h = self.manager.stats(self.parent.context, model)
+        h = self.manager.stats(self.parent.context, model.id)
         self.parent.assertEqual(h, dummy_stats)
 
 
