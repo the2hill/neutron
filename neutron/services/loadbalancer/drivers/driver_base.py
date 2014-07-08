@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from neutron.db.loadbalancer import loadbalancer_db as lb_db
+from neutron.db.loadbalancer import loadbalancer_dbv2 as ldb
 from neutron.services.loadbalancer.drivers import driver_mixins
 
 
@@ -50,38 +50,50 @@ class LoadBalancerBaseDriver(object):
 class BaseLoadBalancerManager(driver_mixins.BaseRefreshMixin,
                               driver_mixins.BaseStatsMixin,
                               driver_mixins.BaseStatusUpdateMixin,
+                              driver_mixins.BaseDeleteHelperMixin,
                               driver_mixins.BaseManagerMixin):
+    model_class = ldb.LoadBalancer
 
-    def __init__(self, driver):
-        super(BaseLoadBalancerManager, self).__init__(driver)
-        # TODO(dougw), use lb_db.LoadBalancer when v2 lbaas
-        # TODO(dougw), get rid of __init__() in StatusHelperManager, and
-        # the if is not None clauses; after fixing this next line,
-        # it can become a mandatory variable for that subclass.
-        self.model_class = None
+    @property
+    def db_delete_method(self):
+        return self.driver.plugin._delete_db_loadbalancer
 
 
-class BaseListenerManager(driver_mixins.BaseManagerMixin):
-    pass
+class BaseListenerManager(driver_mixins.BaseStatusUpdateMixin,
+                          driver_mixins.BaseDeleteHelperMixin,
+                          driver_mixins.BaseManagerMixin):
+    model_class = ldb.Listener
+
+    @property
+    def db_delete_method(self):
+        return self.driver.plugin._delete_db_listener
 
 
 class BasePoolManager(driver_mixins.BaseStatusUpdateMixin,
+                      driver_mixins.BaseDeleteHelperMixin,
                       driver_mixins.BaseManagerMixin):
+    model_class = ldb.PoolV2
 
-    def __init__(self, driver):
-        super(BasePoolManager, self).__init__(driver)
-        self.model_class = lb_db.Pool
+    @property
+    def db_delete_method(self):
+        return self.driver.plugin._delete_db_pool
 
 
 class BaseMemberManager(driver_mixins.BaseStatusUpdateMixin,
+                        driver_mixins.BaseDeleteHelperMixin,
                         driver_mixins.BaseManagerMixin):
+    model_class = ldb.MemberV2
 
-    def __init__(self, driver):
-        super(BaseMemberManager, self).__init__(driver)
-        self.model_class = lb_db.Member
+    @property
+    def db_delete_method(self):
+        return self.driver.plugin.delete_member
 
 
-class BaseHealthMonitorManager(
-                              driver_mixins.BaseHealthMonitorStatusUpdateMixin,
-                              driver_mixins.BaseManagerMixin):
-    pass
+class BaseHealthMonitorManager(driver_mixins.BaseStatusUpdateMixin,
+                               driver_mixins.BaseDeleteHelperMixin,
+                               driver_mixins.BaseManagerMixin):
+    model_class = ldb.HealthMonitorV2
+
+    @property
+    def db_delete_method(self):
+        return self.driver.plugin._delete_db_healthmonitor
