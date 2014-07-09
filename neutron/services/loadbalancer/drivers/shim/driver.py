@@ -16,18 +16,21 @@
 
 from neutron.services.loadbalancer.drivers import driver_base
 from neutron.services.loadbalancer.drivers.shim import converter
+from neutron.openstack.common import log as logging
 from neutron.services.loadbalancer.drivers.shim import plugin
+
+
+LOG = logging.getLogger(__name__)
 
 
 class LBShimDriver(driver_base.LoadBalancerBaseDriver):
     """Wrap a v1 LBaaS driver to present the v2 interface"""
 
-    def __init__(self, plugin_v2, driver_cls):
+    def __init__(self, plugin_v2, driver):
         self.converter = converter.LBObjectModelConverter(self)
         self.plugin = plugin_v2
         self.wrapped_plugin = plugin.Plugin(self.plugin, self.converter)
-        self.wrapped_driver = driver_cls(self.wrapped_plugin)
-
+        self.wrapped_driver = driver.__class__(self.wrapped_plugin)
         self.load_balancer = LBShimLoadBalancerManager(self)
         self.listener = LBShimListenerManager(self)
         self.pool = LBShimPoolManager(self)

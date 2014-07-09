@@ -31,6 +31,9 @@ from neutron.services.loadbalancer import agent_scheduler
 from neutron.services import provider_configuration as pconf
 from neutron.services import service_base
 
+from neutron.services.loadbalancer.drivers.shim import driver as shim_driver
+
+
 LOG = logging.getLogger(__name__)
 
 
@@ -367,6 +370,20 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
         self.drivers, self.default_provider = service_base.load_drivers(
             constants.LOADBALANCERv2, self)
 
+        #TODO(Remove this loop block once v1 api has been removed...)
+        for provider_name in self.drivers:
+            if self._is_driver_old_style(self.drivers[provider_name]):
+                LOG.debug(_("Attetmpting to load shim for"
+                            " '%(provider)s' provider for service "
+                            "%(service_type)s"),
+                          {'provider': provider_name})
+                self.drivers[provider_name] = shim_driver.LBShimDriver(
+                    self, self.drivers[provider_name])
+                LOG.debug(_("Loaded shim for"
+                            " '%(provider)s' provider for service "
+                            "%(service_type)s"),
+                          {'provider': provider_name})
+
         # we're at the point when extensions are not loaded yet
         # so prevent policy from being loaded
         ctx = context.get_admin_context(load_admin_roles=False)
@@ -421,8 +438,8 @@ class LoadBalancerPluginv2(ldbv2.LoadBalancerPluginDbv2,
                     service_type=constants.LOADBALANCER)
             return self.default_provider
 
-    def _is_driver_new_style(self, driver):
-        return not hasattr(driver, 'create_vip')
+    def _is_driver_old_style(self, driver):
+        return hasattr(driver, 'create_vip')
 
     def _call_driver_operation(self, context, driver_method, db_entity,
                                old_db_entity=None):
