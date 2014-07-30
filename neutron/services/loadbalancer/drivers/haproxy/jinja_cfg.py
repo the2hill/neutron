@@ -58,9 +58,11 @@ JINJA_ENV = None
 
 
 def save_config(conf_path, loadbalancer, socket_path=None,
-                user_group='nogroup'):
+                user_group='nogroup', state_path=None):
     """Convert a logical configuration to the HAProxy version."""
-    config_str = render_loadbalancer_obj(loadbalancer, user_group, socket_path)
+    config_str = render_loadbalancer_obj(loadbalancer, user_group=user_group,
+                                         socket_path=socket_path,
+                                         state_path=state_path)
     utils.replace_file(conf_path, config_str)
 
 
@@ -74,16 +76,33 @@ def _get_template():
     return JINJA_ENV.get_template(TEMPLATE_FILE)
 
 
-def render_loadbalancer_obj(loadbalancer, user_group, socket_path):
-    loadbalancer = _transform_loadbalancer(loadbalancer)
+def render_loadbalancer_obj(loadbalancer, user_group, socket_path,
+                            state_path=None):
+    loadbalancer = _transform_loadbalancer(loadbalancer, state_path)
     return _get_template().render({'loadbalancer': loadbalancer,
                                    'user_group': user_group,
                                    'stats_sock': socket_path},
                                   constants=constants)
 
 
-def _transform_loadbalancer(loadbalancer):
-    listeners = [_transform_listener(x) for x in loadbalancer.listeners]
+def _store_listener_cert(state_path, loadbalancer_id, listener):
+    if state_path and loadbalancer_id:
+        confs_dir = os.path.abspath(os.path.normpath(state_path))
+        conf_dir = os.path.join(confs_dir, loadbalancer_id)
+        if not os.path.isdir(conf_dir):
+            os.makedirs(conf_dir, 0o755)
+        cert_path = os.path.join(
+            conf_dir, '{0}_{1}.crt'.format(
+                loadbalancer_id, listener.default_tls_container_id))
+        utils.replace_file(
+            cert_path, listener.default_tls_container.x509cert)
+        return cert_path
+
+
+def _transform_loadbalancer(loadbalancer, state_path=None):
+    listeners = [
+        _transform_listener(
+            x, loadbalancer.id, state_path) for x in loadbalancer.listeners]
     return {
         'name': loadbalancer.name,
         'vip_address': loadbalancer.vip_address,
@@ -91,15 +110,19 @@ def _transform_loadbalancer(loadbalancer):
     }
 
 
-def _transform_listener(listener):
+def _transform_listener(listener, loadbalancer_id=None, state_path=None):
     ret_value = {
         'id': listener.id,
         'protocol_port': listener.protocol_port,
         'protocol': PROTOCOL_MAP[listener.protocol],
-        'connection_limit': listener.connection_limit
+        'connection_limit': listener.connection_limit,
     }
+    if listener.default_tls_container_id:
+        ret_value['default_tls_path'] = _store_listener_cert(
+            state_path, loadbalancer_id, listener)
     if listener.default_pool:
         ret_value['default_pool'] = _transform_pool(listener.default_pool)
+
 
     return ret_value
 
