@@ -31,8 +31,11 @@ class TestHaproxyCfg(base.BaseTestCase):
         ) as (r_t, replace):
             r_t.return_value = 'fake_rendered_template'
             lb = mock.Mock()
-            jinja_cfg.save_config('test_conf_path', lb, 'test_sock_path')
-            r_t.assert_called_once_with(lb, 'nogroup', 'test_sock_path')
+            jinja_cfg.save_config('test_conf_path', lb, 'test_sock_path',
+                                  state_path='test_state_path')
+            r_t.assert_called_once_with(lb, user_group='nogroup',
+                                        socket_path='test_sock_path',
+                                        state_path='test_state_path')
             replace.assert_called_once_with('test_conf_path',
                                             'fake_rendered_template')
 
@@ -232,3 +235,50 @@ class TestHaproxyCfg(base.BaseTestCase):
         in_lb = sample_configs.sample_loadbalancer_tuple()
         ret = jinja_cfg._transform_loadbalancer(in_lb)
         self.assertEqual(sample_configs.RET_LB, ret)
+
+    def test_include_member(self):
+        ret = jinja_cfg._include_member(
+            sample_configs.sample_member_tuple('sample_member_id_1',
+                                               '10.0.0.99'))
+        self.assertTrue(ret)
+
+    def test_include_member_invalid_status(self):
+        ret = jinja_cfg._include_member(
+            sample_configs.sample_member_tuple('sample_member_id_1',
+                                               '10.0.0.99', status='PENDING'))
+        self.assertFalse(ret)
+
+    def test_include_member_invalid_admin_state(self):
+        ret = jinja_cfg._include_member(
+            sample_configs.sample_member_tuple('sample_member_id_1',
+                                               '10.0.0.99',
+                                               admin_state=False))
+        self.assertFalse(ret)
+
+    def test_expand_expected_codes(self):
+        exp_codes = ''
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes), set([]))
+        exp_codes = '200'
+        self.assertEqual(
+            jinja_cfg._expand_expected_codes(exp_codes), set(['200']))
+        exp_codes = '200, 201'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201']))
+        exp_codes = '200, 201,202'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201', '202']))
+        exp_codes = '200-202'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201', '202']))
+        exp_codes = '200-202, 205'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201', '202', '205']))
+        exp_codes = '200, 201-203'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201', '202', '203']))
+        exp_codes = '200, 201-203, 205'
+        self.assertEqual(jinja_cfg._expand_expected_codes(exp_codes),
+                         set(['200', '201', '202', '203', '205']))
+        exp_codes = '201-200, 205'
+        self.assertEqual(
+            jinja_cfg._expand_expected_codes(exp_codes), set(['205']))

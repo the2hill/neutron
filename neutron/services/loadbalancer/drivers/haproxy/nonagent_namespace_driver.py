@@ -24,6 +24,7 @@ from oslo.config import cfg
 from neutron.agent.common import config
 from neutron.agent.linux import interface
 from neutron.agent.linux import ip_lib
+from neutron.agent.linux import utils
 from neutron.common import exceptions
 from neutron.common import utils as n_utils
 from neutron import context
@@ -154,10 +155,11 @@ class HaproxyNSDriver(driver_base.LoadBalancerBaseDriver):
                 portbindings.HOST_ID: self.conf.host}
 
     def _get_state_file_path(self, loadbalancer_id, kind,
-                             ensure_state_dir=True):
+                             ensure_state_dir=True, subdir=None):
         """Returns the file name for a given kind of config file."""
         confs_dir = os.path.abspath(os.path.normpath(self.state_path))
-        conf_dir = os.path.join(confs_dir, loadbalancer_id)
+        subdir = '' if subdir is None else subdir
+        conf_dir = os.path.join(confs_dir, loadbalancer_id, subdir)
         if ensure_state_dir:
             if not os.path.isdir(conf_dir):
                 os.makedirs(conf_dir, 0o755)
@@ -233,13 +235,14 @@ class HaproxyNSDriver(driver_base.LoadBalancerBaseDriver):
     def _spawn(self, loadbalancer, extra_cmd_args=()):
         namespace = get_ns_name(loadbalancer.id)
         conf_path = self._get_state_file_path(loadbalancer.id, 'haproxy.conf')
-        pid_path = self._get_state_file_path(loadbalancer.id,
-                                             'haproxy.pid')
-        sock_path = self._get_state_file_path(loadbalancer.id,
-                                              'haproxy_stats.sock')
+        pid_path = self._get_state_file_path(
+            loadbalancer.id, 'haproxy.pid', subdir='run')
+        sock_path = self._get_state_file_path(
+            loadbalancer.id, 'haproxy_stats.sock', subdir='run')
         user_group = self.conf.haproxy.user_group
 
-        jinja_cfg.save_config(conf_path, loadbalancer, sock_path, user_group)
+        jinja_cfg.save_config(conf_path, loadbalancer, sock_path,
+                              user_group, self.state_path)
         cmd = ['haproxy', '-f', conf_path, '-p', pid_path]
         cmd.extend(extra_cmd_args)
 

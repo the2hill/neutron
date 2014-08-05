@@ -67,9 +67,11 @@ cfg.CONF.register_opts(jinja_opts, 'haproxy')
 
 
 def save_config(conf_path, loadbalancer, socket_path=None,
-                user_group='nogroup'):
+                user_group='nogroup', state_path=None):
     """Convert a logical configuration to the HAProxy version."""
-    config_str = render_loadbalancer_obj(loadbalancer, user_group, socket_path)
+    config_str = render_loadbalancer_obj(loadbalancer, user_group=user_group,
+                                         socket_path=socket_path,
+                                         state_path=state_path)
     utils.replace_file(conf_path, config_str)
 
 
@@ -84,16 +86,37 @@ def _get_template():
         cfg.CONF.haproxy.jinja_config_template))
 
 
-def render_loadbalancer_obj(loadbalancer, user_group, socket_path):
-    loadbalancer = _transform_loadbalancer(loadbalancer)
+def render_loadbalancer_obj(loadbalancer, user_group, socket_path,
+                            state_path=None):
+    loadbalancer = _transform_loadbalancer(loadbalancer, state_path)
     return _get_template().render({'loadbalancer': loadbalancer,
                                    'user_group': user_group,
                                    'stats_sock': socket_path},
                                   constants=constants)
 
 
-def _transform_loadbalancer(loadbalancer):
-    listeners = [_transform_listener(x) for x in loadbalancer.listeners]
+def _store_listener_cert(state_path, loadbalancer_id, crt_id, crt):
+    cert_path = _retrieve_crt_path(state_path, loadbalancer_id, crt_id)
+    utils.replace_file(cert_path, crt)
+    return cert_path
+
+def _retrieve_crt_path(state_path, loadbalancer_id, crt_id):
+    if state_path and loadbalancer_id:
+        conf_dir = _retrieve_data_dir(state_path, loadbalancer_id)
+        if not os.path.isdir(conf_dir):
+            os.makedirs(conf_dir, 0o755)
+        return os.path.join(
+            conf_dir, '{0}.pem'.format( crt_id))
+
+def _retrieve_data_dir(state_path, loadbalancer_id):
+        confs_dir = os.path.abspath(os.path.normpath(state_path))
+        return os.path.join(confs_dir, loadbalancer_id)
+
+
+def _transform_loadbalancer(loadbalancer, state_path=None):
+    listeners = [
+        _transform_listener(
+            x, loadbalancer.id, state_path) for x in loadbalancer.listeners]
     return {
         'name': loadbalancer.name,
         'vip_address': loadbalancer.vip_address,
@@ -101,16 +124,24 @@ def _transform_loadbalancer(loadbalancer):
     }
 
 
-def _transform_listener(listener):
+def _transform_listener(listener, loadbalancer_id=None, state_path=None):
     ret_value = {
         'id': listener.id,
         'protocol_port': listener.protocol_port,
         'protocol': PROTOCOL_MAP[listener.protocol],
-        'connection_limit': listener.connection_limit
+        'connection_limit': listener.connection_limit,
     }
+    if listener.default_tls_container_id:
+        ret_value['default_tls_path'] = _store_listener_cert(
+            state_path, loadbalancer_id, listener.default_tls_container_id,
+            listener.default_tls_container.allemcompassingpem)
+    if listener.sni_container_ids:
+        for c in listener.sni_containers:
+            _store_listener_cert(state_path, loadbalancer_id, c.id,
+                                 c.allemcompassingpem)
+        ret_value['crt_dir'] = _retrieve_crt_path(state_path, loadbalancer_id)
     if listener.default_pool:
         ret_value['default_pool'] = _transform_pool(listener.default_pool)
-
     return ret_value
 
 

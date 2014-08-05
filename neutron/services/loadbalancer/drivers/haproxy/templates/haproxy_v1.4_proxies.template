@@ -13,7 +13,18 @@
 #    under the License.
 #
 #}
+{# Hack: Use raw blocks to remove unwanted line break space after variables #}
 {% extends 'haproxy_base.template' %}
+
+{% macro bind_macro(constants, listener, lb_vip_address) %}
+bind {{ lb_vip_address }}:{{ listener.protocol_port }}
+{% endmacro %}
+
+{% macro use_backend_macro(listener) %}
+{% if listener.default_pool %}
+default_backend {{ listener.default_pool.id }}
+{% endif %}
+{% endmacro %}
 
 {% macro frontend_macro(constants, listener, lb_vip_address) %}
 frontend {{ listener.id }}
@@ -24,11 +35,9 @@ frontend {{ listener.id }}
 {% if listener.protocol == constants.PROTOCOL_HTTP.lower() %}
     option forwardfor
 {% endif %}
-    bind {{ lb_vip_address }}:{{ listener.protocol_port }}
+    {{ bind_macro(constants, listener, lb_vip_address) }}{% raw %}{% endraw %}
     mode {{ listener.protocol }}
-{% if listener.default_pool %}
-    default_backend {{ listener.default_pool.id }}
-{% endif %}
+    {{ use_backend_macro(listener) }}{% raw %}{% endraw %}
 {% endmacro %}
 
 {% macro backend_macro(constants, listener, pool) %}

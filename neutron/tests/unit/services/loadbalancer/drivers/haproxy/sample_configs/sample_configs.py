@@ -28,7 +28,7 @@ RET_MONITOR = {
         'http_method': 'GET',
         'url_path': '/index.html',
         'expected_codes': '405|404|500',
-        'admin_state_up': 'true'}
+        'admin_state_up': True}
 
 RET_MEMBER_1 = {
         'id': 'sample_member_id_1',
@@ -36,7 +36,7 @@ RET_MEMBER_1 = {
         'protocol_port': 82,
         'weight': 13,
         'subnet_id': '10.0.0.1/24',
-        'admin_state_up': 'true',
+        'admin_state_up': True,
         'status': 'ACTIVE'}
 
 RET_MEMBER_2 = {
@@ -45,7 +45,7 @@ RET_MEMBER_2 = {
         'protocol_port': 82,
         'weight': 13,
         'subnet_id': '10.0.0.1/24',
-        'admin_state_up': 'true',
+        'admin_state_up': True,
         'status': 'ACTIVE'}
 
 RET_POOL = {
@@ -55,7 +55,7 @@ RET_POOL = {
         'members': [RET_MEMBER_1, RET_MEMBER_2],
         'health_monitor': RET_MONITOR,
         'session_persistence': RET_PERSISTENCE,
-        'admin_state_up': 'true',
+        'admin_state_up': True,
         'status': 'ACTIVE'}
 
 RET_LISTENER = {
@@ -101,7 +101,8 @@ def sample_listener_tuple(proto=None, monitor=True, persistence=True,
     proto = 'HTTP' if proto is None else proto
     in_listener = collections.namedtuple(
         'listener', 'id, protocol_port, protocol, default_pool, '
-                    'connection_limit')
+                    'connection_limit, default_tls_container_id, '
+                    'default_tls_container')
     return in_listener(
         id='sample_listener_id_1',
         protocol_port=80,
@@ -109,7 +110,9 @@ def sample_listener_tuple(proto=None, monitor=True, persistence=True,
         default_pool=sample_pool_tuple(proto=proto, monitor=monitor,
                                        persistence=persistence,
                                        persistence_type=persistence_type),
-        connection_limit=98
+        connection_limit=98,
+        default_tls_container_id=None,
+        default_tls_container=None
     )
 
 
@@ -130,11 +133,12 @@ def sample_pool_tuple(proto=None, monitor=True, persistence=True,
                  sample_member_tuple('sample_member_id_2', '10.0.0.98')],
         healthmonitor=mon,
         sessionpersistence=persis,
-        admin_state_up='true',
+        admin_state_up=True,
         status='ACTIVE')
 
 
-def sample_member_tuple(id, ip):
+def sample_member_tuple(id='sample_member_id', ip='10.0.0.1',
+                        status='ACTIVE', admin_state=True):
     in_member = collections.namedtuple('member',
                                        'id, address, protocol_port, '
                                        'weight, subnet_id, '
@@ -145,8 +149,8 @@ def sample_member_tuple(id, ip):
         protocol_port=82,
         weight=13,
         subnet_id='10.0.0.1/24',
-        admin_state_up='true',
-        status='ACTIVE')
+        admin_state_up=admin_state,
+        status=status)
 
 
 def sample_session_persistence_tuple(persistence_type=None):
@@ -166,7 +170,7 @@ def sample_health_monitor_tuple(proto=None):
     return monitor(id='sample_monitor_id_1', type=proto, delay=30,
                    timeout=31, max_retries=3, http_method='GET',
                    url_path='/index.html', expected_codes='500, 405, 404',
-                   admin_state_up='true')
+                   admin_state_up=True)
 
 
 def sample_base_expected_config(frontend=None, backend=None):

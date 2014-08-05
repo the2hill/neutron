@@ -214,13 +214,14 @@ class TestHaproxyNSDriver(base.BaseTestCase):
             mock.patch.object(self.driver, '_get_state_file_path'),
             mock.patch('neutron.agent.linux.ip_lib.IPWrapper')
         ) as (mock_save, gsp, ip_wrap):
-            gsp.side_effect = lambda x, y: y
+            gsp.side_effect = lambda x, y, **z: y
 
             self.driver._spawn(self._sample_in_loadbalancer())
 
             mock_save.assert_called_once_with('haproxy.conf',
                                               self._sample_in_loadbalancer(),
-                                              'haproxy_stats.sock', 'nogroup')
+                                              'haproxy_stats.sock', 'nogroup',
+                                              '/the/path/v2')
             cmd = ['haproxy', '-f', 'haproxy.conf', '-p', 'haproxy.pid']
             ns_name = ''.join([nonagent_namespace_driver.NS_PREFIX,
                               self._sample_in_loadbalancer().id])
@@ -612,7 +613,7 @@ class TestHaproxyNSDriver(base.BaseTestCase):
         with mock.patch('os.makedirs') as mkdir:
             path = self.driver._get_state_file_path('loadbalancer_id', 'conf')
             self.assertEqual('/the/path/v2/loadbalancer_id/conf', path)
-            mkdir.assert_called_once_with('/the/path/v2/loadbalancer_id',
+            mkdir.assert_called_once_with('/the/path/v2/loadbalancer_id/',
                                           0o755)
 
     #TODO(ptoohill) put samples in reusable location
