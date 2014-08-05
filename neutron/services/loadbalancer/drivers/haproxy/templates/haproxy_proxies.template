@@ -17,7 +17,17 @@
 {% extends 'haproxy_base.template' %}
 
 {% macro bind_macro(constants, listener, lb_vip_address) %}
-bind {{ lb_vip_address }}:{{ listener.protocol_port }}
+{% if listener.default_tls_container_id %}
+{% set def_crt_opt = "crt %s"|format(default_tls_path)|trim() %}
+{% else %}
+{% set def_crt_opt = "" %}
+{% endif %}
+{% if listener.sni_container_ids %}
+{% set crt_dir_opt = "crt %s"|format(crt_dir)|trim() %}
+{% else %}
+{% set crt_dir_opt = "" %}
+{% endif %}
+bind {{ lb_vip_address }}:{{ listener.protocol_port }}{{ " %s  %s"|format(def_crt_opt, crt_dir_opt)|trim() }}
 {% endmacro %}
 
 {% macro use_backend_macro(listener) %}

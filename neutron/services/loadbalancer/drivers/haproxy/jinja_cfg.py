@@ -135,7 +135,8 @@ def _transform_listener(listener, loadbalancer_id=None, state_path=None):
         ret_value['default_tls_path'] = _store_listener_cert(
             state_path, loadbalancer_id, listener.default_tls_container_id,
             listener.default_tls_container.allemcompassingpem)
-    if listener.sni_container_ids:
+    if hasattr(listener,
+               'sni_container_ids') and listener.sni_container_ids is not None:
         for c in listener.sni_containers:
             _store_listener_cert(state_path, loadbalancer_id, c.id,
                                  c.allemcompassingpem)
